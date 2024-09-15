@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Applicazione Serverless Unificata
+
+Globals:
+  Function:
+    Timeout: 180
+    MemorySize: 1024
+    Tracing: Active
+  Api:
+    TracingEnabled: true
+
+Resources:
+  DiscordAuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ChatBotDiscord/src/
+      Handler: entry.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          APPLICATION_PUBLIC_KEY: 
+          DISCORD_BOT_TOKEN:
+          APPLICATION_ID: 
+          AI21_API_KEY:
+          ROLE_AWS_COMPANY:
+          STEP_FUNCTIONS_EVENTS_ARN:
+      Events:
+        DiscordAuth:
+          Type: Api
+          Properties:
+            Path: /discord_auth
+            Method: post
+
+  #GestioneNewsFunction:
+   # Type: AWS::Serverless::Function
+    #Properties:
+     # CodeUri: GestioneNews/src/
+      #Handler: CaricaNews.lambda_handler
+      #Runtime: python3.9
+      #Architectures:
+       # - x86_64
+      #Environment:
+        #Variables:
+         # DISCORD_BOT_TOKEN:
+      #Events:
+       # GestioneNews:
+        #  Type: Api
+         # Properties:
+          #  Path: /gestione_news
+           # Method: get
+
+  NotificheEventiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: NotificheEventi/src/
+      Handler: entry.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          DISCORD_BOT_TOKEN: 
+      Events:
+        NotificheEventi:
+          Type: Api
+          Properties:
+            Path: /notifiche_eventi
+            Method: get
+
+  PollsAutoDeleteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: PollsAutoDelete/src/
+      Handler: entry.lambda_handler
+      Runtime: python3.9s
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          DISCORD_BOT_TOKEN:
+      Events:
+        PollsAutoDelete:
+          Type: Api
+          Properties:
+            Path: /polls_auto_delete
+            Method: get
+
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+
+Outputs:
+  GestioneNewsApi:
+    Description: "API Gateway endpoint URL for Prod stage for GestioneNews function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/gestione_news/"
+
+  NotificheEventiApi:
+    Description: "API Gateway endpoint URL for Prod stage for NotificheEventi function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/notifiche_eventi/"
+
+  pollsDeleteApi:
+    Description: "API Gateway endpoint URL for Prod stage for PollsAutoDelete function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/polls_auto_delete/"
