@@ -53,6 +53,7 @@ Resources:
           #  Path: /gestione_news
            # Method: get
 
+
   NotificheEventiFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -70,6 +71,14 @@ Resources:
           Properties:
             Path: /notifiche_eventi
             Method: get
+        ScheduledEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 22/4 * * ? *)  # Pianificazione ogni 4 ore a partire da mezzanotte ora italiana
+            Name: "NotificheEventiScheduler"
+            Description: "Pianifica la Lambda NotificheEventi ogni 4 ore"
+            Enabled: true
+            
 
   PollsAutoDeleteFunction:
     Type: AWS::Serverless::Function
@@ -89,10 +98,164 @@ Resources:
             Path: /polls_auto_delete
             Method: get
 
+  NotificheEventiStepFunction:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString: !Sub |
+        {
+          "Comment": "A description of my state machine",
+          "StartAt": "Wait",
+          "States": {
+            "Wait": {
+              "Type": "Wait",
+              "TimestampPath": "$.event_time",
+              "Next": "NotificaEvento"
+            },
+            "NotificaEvento": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "FunctionName": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:NotificheEventi-NotificheEventi-NUIioVvuoB4K:$LATEST",
+                "Payload.$": "$"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "End": true
+            }
+          }
+        }
+      RoleArn: arn:aws:iam::${AWS::AccountId}:role/StepFunctionExecutionRole
+
+  DeletePollStepFunction:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString: !Sub |
+        {
+          "Comment": "A description of my state machine",
+          "StartAt": "Wait",
+          "States": {
+            "Wait": {
+              "Type": "Wait",
+              "Next": "DeletePoll",
+              "TimestampPath": "$.event_time"
+            },
+            "DeletePoll": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:PollsAutoDelete-PollsAutoDelete-ggf2gi5CHnxO:$LATEST"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "End": true
+            }
+          }
+        }
+      RoleArn: arn:aws:iam::${AWS::AccountId}:role/StepFunctionExecutionRole
+
   MyS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName:
+      BucketName: documentsbucketchatbotdiscord
+      AccessControl: Private
+
+  CalendarioTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: Calendario
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: 
+        - AttributeName: userid
+          AttributeType: S
+        - AttributeName: title
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema: 
+        - AttributeName: userid
+          KeyType: HASH  # Chiave di partizione
+        - AttributeName: title
+          KeyType: RANGE # Chiave di ordinamento
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: timestamp
+
+  NewsTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: News
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: 
+        - AttributeName: serverid
+          AttributeType: S
+      KeySchema: 
+        - AttributeName: serverid
+          KeyType: HASH  # Chiave di partizione
+
+  SentimentTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: Sentiment
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: 
+        - AttributeName: serverid
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema: 
+        - AttributeName: serverid
+          KeyType: HASH  # Chiave di partizione
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: timestamp
+
+  VotiSondaggiTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: VotiSondaggi
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: 
+        - AttributeName: messageid
+          AttributeType: S
+        - AttributeName: userid
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema: 
+        - AttributeName: messageid
+          KeyType: HASH  # Chiave di partizione
+        - AttributeName: userid
+          KeyType: RANGE # Chiave di ordinamento
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: timestamp
+  
+
 
 Outputs:
   GestioneNewsApi:
